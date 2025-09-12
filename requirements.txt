@@ -1,5 +1,4 @@
-# capitolAllText.py
-pyperclip
-# upperAllText.py
-psutil==6.1.0
-pywin32==308
+# Dependencies for both capitolAllText.py and upperAllText.py
+pyperclip>=1.8.2
+psutil>=5.9.0
+pywin32>=305; sys_platform == 'win32'
