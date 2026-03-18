@@ -1,12 +1,90 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter.scrolledtext import ScrolledText
 import subprocess
 import os
 import sys
 import tempfile
 import atexit
 import time
+import threading
+import shutil
 from pathlib import Path
+
+try:
+    from PIL import ImageGrab, Image
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
+try:
+    import pytesseract
+    HAS_PYTESSERACT = True
+except ImportError:
+    pytesseract = None
+    HAS_PYTESSERACT = False
+
+if hasattr(sys, '_MEIPASS'):
+    BASE_DIR = Path(sys._MEIPASS)
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+
+TESSERACT_DIR = BASE_DIR / 'redist' / 'tesseract-5.5.1'
+TESSERACT_EXE_NAME = 'tesseract.exe' if os.name == 'nt' else 'tesseract'
+TESSERACT_EXE = TESSERACT_DIR / TESSERACT_EXE_NAME
+HAS_TESSERACT_CMD = False
+
+if HAS_PYTESSERACT:
+    candidate_paths = []
+    if TESSERACT_EXE.exists():
+        candidate_paths.append(TESSERACT_EXE)
+
+    env_keys = ("TESSERACT_PATH", "TESSERACT_HOME", "TESSERACT_EXE", "TESSERACT_EXE_PATH")
+    for key in env_keys:
+        value = os.environ.get(key)
+        if not value:
+            continue
+        env_path = Path(value)
+        if env_path.is_dir():
+            env_path = env_path / TESSERACT_EXE_NAME
+        if env_path.exists():
+            candidate_paths.append(env_path)
+
+    program_files = os.environ.get("PROGRAMFILES")
+    if program_files:
+        pf_path = Path(program_files) / "Tesseract-OCR" / TESSERACT_EXE_NAME
+        if pf_path.exists():
+            candidate_paths.append(pf_path)
+
+    program_files_x86 = os.environ.get("PROGRAMFILES(X86)")
+    if program_files_x86:
+        pf86_path = Path(program_files_x86) / "Tesseract-OCR" / TESSERACT_EXE_NAME
+        if pf86_path.exists():
+            candidate_paths.append(pf86_path)
+
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        la_path = Path(localappdata) / "Programs" / "Tesseract-OCR" / TESSERACT_EXE_NAME
+        if la_path.exists():
+            candidate_paths.append(la_path)
+
+    unique_cmds = []
+    for path_cmd in candidate_paths:
+        cmd_str = str(path_cmd)
+        if cmd_str not in unique_cmds:
+            unique_cmds.append(cmd_str)
+
+    tess_cmd_candidate = None
+    if unique_cmds:
+        tess_cmd_candidate = unique_cmds[0]
+    else:
+        fallback_cmd = shutil.which('tesseract')
+        if fallback_cmd:
+            tess_cmd_candidate = fallback_cmd
+
+    if tess_cmd_candidate:
+        pytesseract.pytesseract.tesseract_cmd = tess_cmd_candidate
+        HAS_TESSERACT_CMD = True
 
 try:
     import win32api
@@ -202,6 +280,27 @@ class TextToolsLauncher:
             style="Desc.TLabel"
         ).pack(side=tk.LEFT, fill=tk.X, expand=True)
         
+        # Tool 3: OCR dagli appunti
+        tool3_frame = ttk.Frame(tools_frame)
+        tool3_frame.grid(row=2, column=0, sticky='ew', pady=5, padx=5)
+        
+        btn3 = ttk.Button(
+            tool3_frame,
+            text=" OCR dagli Appunti",
+            command=self.launch_ocr_tool,
+            style="Accent.TButton"
+        )
+        btn3.pack(side=tk.LEFT, padx=(0, 10))
+        
+        if hasattr(self, 'app_icon') and self.app_icon:
+            btn3.configure(image=self.app_icon, compound=tk.LEFT)
+        
+        ttk.Label(
+            tool3_frame,
+            text="Esegue OCR sulle immagini negli appunti e mostra il testo estratto",
+            style="Desc.TLabel"
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
         # Status bar
         self.status_var = tk.StringVar(value="Pronto")
         status_bar = ttk.Label(
@@ -259,7 +358,6 @@ class TextToolsLauncher:
                                 process.wait()
                                 ToolLock().release_lock(tool_name)
                             
-                            import threading
                             monitor_thread = threading.Thread(target=monitor_process, daemon=True)
                             monitor_thread.start()
                             
@@ -273,7 +371,6 @@ class TextToolsLauncher:
                         self.root.after(0, lambda: self.status_var.set("Errore durante l'avvio dello strumento"))
                 
                 # Run the launch in a separate thread to keep the UI responsive
-                import threading
                 threading.Thread(target=cleanup_and_launch, daemon=True).start()
                 
             else:
@@ -290,6 +387,123 @@ class TextToolsLauncher:
     
     def launch_uppercase_tool(self):
         self.launch_tool("upperAllText.py")
+
+    def launch_ocr_tool(self):
+        self.perform_ocr_from_clipboard()
+
+    def perform_ocr_from_clipboard(self):
+        if not HAS_PIL:
+            messagebox.showerror("Dipendenza mancante", "La funzione OCR richiede il pacchetto Pillow.")
+            if hasattr(self, 'status_var'):
+                self.status_var.set("OCR non disponibile (Pillow mancante)")
+            return
+
+        if not HAS_PYTESSERACT:
+            messagebox.showerror("Dipendenza mancante", "La funzione OCR richiede il pacchetto pytesseract e il motore Tesseract.")
+            if hasattr(self, 'status_var'):
+                self.status_var.set("OCR non disponibile (pytesseract mancante)")
+            return
+
+        if not HAS_TESSERACT_CMD:
+            messagebox.showerror("Tesseract non configurato", "Motore Tesseract non trovato nella cartella 'redist\\tesseract-5.5.1', in Program Files/Tesseract-OCR o nel PATH di sistema.")
+            if hasattr(self, 'status_var'):
+                self.status_var.set("OCR non disponibile (Tesseract mancante)")
+            return
+
+        self.status_var.set("Analisi OCR in corso...")
+        self.root.update_idletasks()
+
+        def worker():
+            try:
+                clipboard_data = ImageGrab.grabclipboard()
+            except Exception as exc:
+                self.root.after(0, lambda: self._handle_ocr_failure(f"Impossibile accedere agli appunti: {exc}"))
+                return
+
+            image = None
+            if isinstance(clipboard_data, Image.Image):
+                image = clipboard_data
+            elif isinstance(clipboard_data, list):
+                for item in clipboard_data:
+                    if isinstance(item, str) and os.path.exists(item):
+                        try:
+                            with Image.open(item) as img_file:
+                                image = img_file.convert('RGB')
+                            break
+                        except Exception:
+                            continue
+
+            if image is None:
+                self.root.after(0, self._handle_no_image)
+                return
+
+            if image.mode not in ("RGB", "RGBA", "L"):
+                image = image.convert('RGB')
+
+            try:
+                text_result = pytesseract.image_to_string(image)
+            except getattr(pytesseract, 'TesseractNotFoundError', Exception):
+                self.root.after(0, lambda: self._handle_ocr_failure("Tesseract OCR non trovato. Controllare 'redist\\tesseract-5.5.1', Program Files/Tesseract-OCR o il PATH di sistema."))
+                return
+            except Exception as exc:
+                self.root.after(0, lambda: self._handle_ocr_failure(f"Errore durante l'elaborazione OCR: {exc}"))
+                return
+
+            self.root.after(0, lambda: self._show_ocr_result_window(text_result))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _handle_no_image(self):
+        messagebox.showinfo("Nessuna immagine rilevata", "Gli appunti non contengono un'immagine supportata.")
+        self.status_var.set("Nessuna immagine negli appunti")
+
+    def _handle_ocr_failure(self, error_message):
+        messagebox.showerror("Errore OCR", error_message)
+        self.status_var.set("Errore durante l'OCR")
+
+    def _show_ocr_result_window(self, extracted_text):
+        self.status_var.set("OCR completato")
+        window = tk.Toplevel(self.root)
+        window.title("Risultato OCR dagli appunti")
+        window.geometry("600x450")
+        window.minsize(500, 350)
+        window.transient(self.root)
+
+        container = ttk.Frame(window, padding=15)
+        container.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            container,
+            text="Testo estratto",
+            style="Title.TLabel"
+        ).pack(anchor=tk.W)
+
+        text_area = ScrolledText(container, wrap=tk.WORD, font=('Segoe UI', 10))
+        text_area.pack(fill=tk.BOTH, expand=True, pady=(10, 10))
+        cleaned_text = extracted_text.strip() if extracted_text else ''
+        text_area.insert('1.0', cleaned_text)
+        text_area.focus_set()
+
+        button_frame = ttk.Frame(container)
+        button_frame.pack(fill=tk.X)
+
+        def copy_to_clipboard():
+            content = text_area.get('1.0', tk.END).strip()
+            self.root.clipboard_clear()
+            self.root.clipboard_append(content)
+            self.status_var.set("Testo OCR copiato negli appunti")
+
+        ttk.Button(
+            button_frame,
+            text="Copia negli Appunti",
+            command=copy_to_clipboard
+        ).pack(side=tk.LEFT)
+
+        ttk.Button(
+            button_frame,
+            text="Chiudi",
+            command=window.destroy
+        ).pack(side=tk.RIGHT)
 
 def main():
     root = tk.Tk()
