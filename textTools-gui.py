@@ -273,7 +273,7 @@ class TextToolsLauncher:
 
         bind_responsive_layout(
             top_grid,
-            threshold=980,
+            threshold=900,
             compact_layout=apply_compact_top_grid,
             wide_layout=apply_wide_top_grid,
         )
