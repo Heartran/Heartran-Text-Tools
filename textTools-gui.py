@@ -20,6 +20,8 @@ from ui_theme import (
     TEXT_SECONDARY,
     WINDOW_BG,
     apply_modern_theme,
+    bind_responsive_layout,
+    bind_responsive_wrap,
     create_card,
     configure_text_widget,
 )
@@ -197,12 +199,13 @@ class TextToolsLauncher:
 
         hero = ttk.Frame(shell, style='App.TFrame')
         hero.pack(fill=tk.X, pady=(0, 20))
+        hero.columnconfigure(0, weight=1)
 
         title_block = ttk.Frame(hero, style='App.TFrame')
-        title_block.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        title_block.grid(row=0, column=0, sticky='ew')
 
         ttk.Label(title_block, text="Heartran Text Tools", style='HeroTitle.TLabel').pack(anchor='w')
-        ttk.Label(
+        hero_body = ttk.Label(
             title_block,
             text=(
                 "Una dashboard ispirata a Windows 11 per trasformare il testo negli appunti, "
@@ -211,7 +214,9 @@ class TextToolsLauncher:
             style='HeroBody.TLabel',
             wraplength=620,
             justify=tk.LEFT,
-        ).pack(anchor='w', pady=(8, 0))
+        )
+        hero_body.pack(anchor='w', fill=tk.X, pady=(8, 0))
+        bind_responsive_wrap(hero_body, title_block, padding=20, min_wrap=260)
 
         status_chip = tk.Label(
             hero,
@@ -222,7 +227,7 @@ class TextToolsLauncher:
             padx=16,
             pady=10,
         )
-        status_chip.pack(side=tk.RIGHT, anchor='n')
+        status_chip.grid(row=1, column=0, sticky='e', pady=(12, 0))
 
         top_grid = ttk.Frame(shell, style='App.TFrame')
         top_grid.pack(fill=tk.BOTH, expand=True)
@@ -231,20 +236,51 @@ class TextToolsLauncher:
         top_grid.rowconfigure(0, weight=1)
 
         tools_card = create_card(top_grid, padding=22)
-        tools_card.grid(row=0, column=0, sticky='nsew', padx=(0, 12))
         self._build_tools_card(tools_card)
 
         side_panel = ttk.Frame(top_grid, style='App.TFrame')
-        side_panel.grid(row=0, column=1, sticky='nsew')
+        side_panel.columnconfigure(0, weight=1)
         side_panel.rowconfigure(0, weight=1)
         side_panel.rowconfigure(1, weight=1)
 
-        self._build_overview_card(create_card(side_panel, padding=22)).grid(row=0, column=0, sticky='nsew', pady=(0, 12))
-        self._build_activity_card(create_card(side_panel, padding=22)).grid(row=1, column=0, sticky='nsew')
+        overview_card = create_card(side_panel, padding=22)
+        self._build_overview_card(overview_card)
+        overview_card.grid(row=0, column=0, sticky='nsew', pady=(0, 12))
+
+        activity_card = create_card(side_panel, padding=22)
+        self._build_activity_card(activity_card)
+        activity_card.grid(row=1, column=0, sticky='nsew')
+
+        def apply_compact_top_grid():
+            tools_card.grid_forget()
+            side_panel.grid_forget()
+            top_grid.columnconfigure(0, weight=1)
+            top_grid.columnconfigure(1, weight=0)
+            top_grid.rowconfigure(0, weight=3)
+            top_grid.rowconfigure(1, weight=2)
+            tools_card.grid(row=0, column=0, sticky='nsew', pady=(0, 12))
+            side_panel.grid(row=1, column=0, sticky='nsew')
+
+        def apply_wide_top_grid():
+            tools_card.grid_forget()
+            side_panel.grid_forget()
+            top_grid.columnconfigure(0, weight=3)
+            top_grid.columnconfigure(1, weight=2)
+            top_grid.rowconfigure(0, weight=1)
+            top_grid.rowconfigure(1, weight=0)
+            tools_card.grid(row=0, column=0, sticky='nsew', padx=(0, 12))
+            side_panel.grid(row=0, column=1, sticky='nsew')
+
+        bind_responsive_layout(
+            top_grid,
+            threshold=980,
+            compact_layout=apply_compact_top_grid,
+            wide_layout=apply_wide_top_grid,
+        )
 
     def _build_tools_card(self, parent):
         tk.Label(parent, text="Strumenti", bg=CARD_BG, fg=TEXT_PRIMARY, font=('Segoe UI Semibold', 18)).pack(anchor='w')
-        tk.Label(
+        tools_body = tk.Label(
             parent,
             text="Accesso rapido ai tre flussi principali con card arrotondate, gerarchia visiva chiara e stato sempre visibile.",
             bg=CARD_BG,
@@ -252,7 +288,9 @@ class TextToolsLauncher:
             font=('Segoe UI', 10),
             wraplength=520,
             justify=tk.LEFT,
-        ).pack(anchor='w', pady=(6, 18))
+        )
+        tools_body.pack(anchor='w', fill=tk.X, pady=(6, 18))
+        bind_responsive_wrap(tools_body, parent, padding=44, min_wrap=240)
 
         cards = [
             {
@@ -287,15 +325,16 @@ class TextToolsLauncher:
     def _build_tool_row(self, parent, item):
         row = tk.Frame(parent, bg='#f8faff', highlightthickness=1, highlightbackground='#e4eaf5', padx=18, pady=18)
         row.pack(fill=tk.X, pady=8)
+        row.grid_columnconfigure(1, weight=1)
 
         icon = tk.Label(row, text=item['emoji'], bg='#e8f0ff', fg=ACCENT, font=('Segoe UI Emoji', 18), width=3, pady=8)
-        icon.pack(side=tk.LEFT, padx=(0, 14))
+        icon.grid(row=0, column=0, sticky='nw', padx=(0, 14))
 
         content = tk.Frame(row, bg='#f8faff')
-        content.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        content.grid(row=0, column=1, sticky='nsew')
 
-        tk.Label(content, text=item['title'], bg='#f8faff', fg=TEXT_PRIMARY, font=('Segoe UI Semibold', 12)).pack(anchor='w')
-        tk.Label(
+        tk.Label(content, text=item['title'], bg='#f8faff', fg=TEXT_PRIMARY, font=('Segoe UI Semibold', 12)).pack(anchor='w', fill=tk.X)
+        description = tk.Label(
             content,
             text=item['description'],
             bg='#f8faff',
@@ -303,7 +342,9 @@ class TextToolsLauncher:
             font=('Segoe UI', 10),
             wraplength=420,
             justify=tk.LEFT,
-        ).pack(anchor='w', pady=(5, 0))
+        )
+        description.pack(anchor='w', fill=tk.X, pady=(5, 0))
+        bind_responsive_wrap(description, content, padding=8, min_wrap=180)
 
         action = tk.Button(
             row,
@@ -320,11 +361,29 @@ class TextToolsLauncher:
             cursor='hand2',
             font=('Segoe UI Semibold', 10),
         )
-        action.pack(side=tk.RIGHT)
+
+        def apply_compact_row():
+            action.grid_forget()
+            icon.grid_configure(row=0, column=0, rowspan=2, padx=(0, 14), pady=(2, 0))
+            content.grid_configure(row=0, column=1, columnspan=2, sticky='ew')
+            action.grid(row=1, column=1, columnspan=2, sticky='w', pady=(14, 0))
+
+        def apply_wide_row():
+            action.grid_forget()
+            icon.grid_configure(row=0, column=0, rowspan=1, padx=(0, 14), pady=0)
+            content.grid_configure(row=0, column=1, columnspan=1, sticky='nsew')
+            action.grid(row=0, column=2, sticky='e')
+
+        bind_responsive_layout(
+            row,
+            threshold=640,
+            compact_layout=apply_compact_row,
+            wide_layout=apply_wide_row,
+        )
 
     def _build_overview_card(self, parent):
         tk.Label(parent, text="Panoramica", bg=CARD_BG, fg=TEXT_PRIMARY, font=('Segoe UI Semibold', 16)).pack(anchor='w')
-        tk.Label(
+        overview_body = tk.Label(
             parent,
             text="Il layout segue i principi Windows 11: spaziatura generosa, superfici chiare e CTA ben evidenziate.",
             bg=CARD_BG,
@@ -332,7 +391,9 @@ class TextToolsLauncher:
             font=('Segoe UI', 10),
             wraplength=280,
             justify=tk.LEFT,
-        ).pack(anchor='w', pady=(8, 16))
+        )
+        overview_body.pack(anchor='w', fill=tk.X, pady=(8, 16))
+        bind_responsive_wrap(overview_body, parent, padding=44, min_wrap=180)
 
         for label, value in (
             ('Clipboard tools', '2 monitor live'),
@@ -347,7 +408,7 @@ class TextToolsLauncher:
 
     def _build_activity_card(self, parent):
         tk.Label(parent, text="Attività", bg=CARD_BG, fg=TEXT_PRIMARY, font=('Segoe UI Semibold', 16)).pack(anchor='w')
-        tk.Label(
+        activity_hint = tk.Label(
             parent,
             textvariable=self.quick_hint_var,
             bg=CARD_BG,
@@ -355,7 +416,9 @@ class TextToolsLauncher:
             font=('Segoe UI', 10),
             wraplength=280,
             justify=tk.LEFT,
-        ).pack(anchor='w', pady=(8, 16))
+        )
+        activity_hint.pack(anchor='w', fill=tk.X, pady=(8, 16))
+        bind_responsive_wrap(activity_hint, parent, padding=44, min_wrap=180)
 
         self.activity_log = tk.Text(parent, height=8, wrap='word')
         configure_text_widget(self.activity_log)
@@ -520,7 +583,9 @@ class TextToolsLauncher:
         header = create_card(container, padding=20)
         header.pack(fill=tk.X, pady=(0, 16))
         tk.Label(header, text="Testo estratto", bg=CARD_BG, fg=TEXT_PRIMARY, font=('Segoe UI Semibold', 18)).pack(anchor='w')
-        tk.Label(header, text="Controlla il contenuto, apporta modifiche se necessario e copialo negli appunti con un click.", bg=CARD_BG, fg=TEXT_SECONDARY, font=('Segoe UI', 10), wraplength=600, justify=tk.LEFT).pack(anchor='w', pady=(6, 0))
+        header_body = tk.Label(header, text="Controlla il contenuto, apporta modifiche se necessario e copialo negli appunti con un click.", bg=CARD_BG, fg=TEXT_SECONDARY, font=('Segoe UI', 10), wraplength=600, justify=tk.LEFT)
+        header_body.pack(anchor='w', fill=tk.X, pady=(6, 0))
+        bind_responsive_wrap(header_body, header, padding=40, min_wrap=220)
 
         editor_card = create_card(container, padding=0)
         editor_card.pack(fill=tk.BOTH, expand=True, pady=(0, 16))
@@ -542,8 +607,27 @@ class TextToolsLauncher:
             self.status_var.set("Testo OCR copiato negli appunti")
             self._append_activity("Testo OCR copiato negli appunti.")
 
-        tk.Button(button_row, text="Copia negli appunti", command=copy_to_clipboard, bg=ACCENT, fg='white', activebackground=ACCENT_HOVER, activeforeground='white', relief='flat', bd=0, padx=18, pady=10, cursor='hand2', font=('Segoe UI Semibold', 10)).pack(side=tk.LEFT)
-        ttk.Button(button_row, text="Chiudi", command=window.destroy, style='Secondary.TButton').pack(side=tk.RIGHT)
+        copy_button = tk.Button(button_row, text="Copia negli appunti", command=copy_to_clipboard, bg=ACCENT, fg='white', activebackground=ACCENT_HOVER, activeforeground='white', relief='flat', bd=0, padx=18, pady=10, cursor='hand2', font=('Segoe UI Semibold', 10))
+        close_button = ttk.Button(button_row, text="Chiudi", command=window.destroy, style='Secondary.TButton')
+
+        def apply_compact_button_row():
+            copy_button.pack_forget()
+            close_button.pack_forget()
+            copy_button.pack(fill=tk.X)
+            close_button.pack(fill=tk.X, pady=(10, 0))
+
+        def apply_wide_button_row():
+            copy_button.pack_forget()
+            close_button.pack_forget()
+            copy_button.pack(side=tk.LEFT)
+            close_button.pack(side=tk.RIGHT)
+
+        bind_responsive_layout(
+            button_row,
+            threshold=480,
+            compact_layout=apply_compact_button_row,
+            wide_layout=apply_wide_button_row,
+        )
 
 
 def main():

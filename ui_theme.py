@@ -76,3 +76,53 @@ def configure_text_widget(widget, *, readonly=False):
     )
     if readonly:
         widget.configure(state=tk.DISABLED)
+
+
+def bind_responsive_wrap(widget, container=None, *, padding=0, min_wrap=160):
+    target = container or widget
+    state = {'wraplength': None}
+
+    def update(event=None):
+        if not widget.winfo_exists() or not target.winfo_exists():
+            return
+
+        width = event.width if event is not None and getattr(event, 'width', 0) else target.winfo_width()
+        if width <= 1:
+            return
+
+        wraplength = max(min_wrap, width - padding)
+        if wraplength == state['wraplength']:
+            return
+
+        widget.configure(wraplength=wraplength)
+        state['wraplength'] = wraplength
+
+    target.bind('<Configure>', update, add='+')
+    target.after_idle(update)
+    return widget
+
+
+def bind_responsive_layout(container, *, threshold, compact_layout, wide_layout):
+    state = {'compact': None}
+
+    def update(event=None):
+        if not container.winfo_exists():
+            return
+
+        width = event.width if event is not None and getattr(event, 'width', 0) else container.winfo_width()
+        if width <= 1:
+            return
+
+        compact = width < threshold
+        if compact == state['compact']:
+            return
+
+        state['compact'] = compact
+        if compact:
+            compact_layout()
+        else:
+            wide_layout()
+
+    container.bind('<Configure>', update, add='+')
+    container.after_idle(update)
+    return container

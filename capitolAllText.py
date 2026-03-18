@@ -10,7 +10,19 @@ import psutil
 import re
 import sys
 
-from ui_theme import ACCENT, ACCENT_HOVER, CARD_BG, SUCCESS, TEXT_PRIMARY, TEXT_SECONDARY, apply_modern_theme, create_card, configure_text_widget
+from ui_theme import (
+    ACCENT,
+    ACCENT_HOVER,
+    CARD_BG,
+    SUCCESS,
+    TEXT_PRIMARY,
+    TEXT_SECONDARY,
+    apply_modern_theme,
+    bind_responsive_layout,
+    bind_responsive_wrap,
+    create_card,
+    configure_text_widget,
+)
 
 running = True
 
@@ -140,7 +152,7 @@ def toggle_running(toggle_button, pill):
 
 def main():
     try:
-        import pyperclip
+        import pyperclip  # noqa: F401
     except ImportError:
         print("Errore: pyperclip non è installato. Installalo con: pip install pyperclip")
         sys.exit(1)
@@ -157,7 +169,15 @@ def main():
     header = ttk.Frame(shell, style='App.TFrame')
     header.pack(fill=tk.X, pady=(0, 16))
     ttk.Label(header, text="Maiuscole intelligenti", style='HeroTitle.TLabel').pack(anchor='w')
-    ttk.Label(header, text="Restyle completo con card, spaziatura più ariosa e controlli chiari per rendere il monitor clipboard più vicino al linguaggio visivo di Windows 11.", style='HeroBody.TLabel', wraplength=700, justify=tk.LEFT).pack(anchor='w', pady=(8, 0))
+    header_body = ttk.Label(
+        header,
+        text="Restyle completo con card, spaziatura più ariosa e controlli chiari per rendere il monitor clipboard più vicino al linguaggio visivo di Windows 11.",
+        style='HeroBody.TLabel',
+        wraplength=700,
+        justify=tk.LEFT,
+    )
+    header_body.pack(anchor='w', fill=tk.X, pady=(8, 0))
+    bind_responsive_wrap(header_body, header, padding=16, min_wrap=260)
 
     pill = tk.Label(header, text="Monitor attivo", bg='#dcfce7', fg=SUCCESS, font=('Segoe UI Semibold', 10), padx=14, pady=8)
     pill.pack(anchor='e', pady=(10, 0))
@@ -165,7 +185,17 @@ def main():
     preview_card = create_card(shell, padding=20)
     preview_card.pack(fill=tk.BOTH, expand=True, pady=(0, 16))
     tk.Label(preview_card, text="Anteprima live", bg=CARD_BG, fg=TEXT_PRIMARY, font=('Segoe UI Semibold', 16)).pack(anchor='w')
-    tk.Label(preview_card, text="Ideale per nomi propri, elenchi e rubriche: il testo convertito resta in primo piano e sempre leggibile.", bg=CARD_BG, fg=TEXT_SECONDARY, font=('Segoe UI', 10), wraplength=760, justify=tk.LEFT).pack(anchor='w', pady=(6, 14))
+    preview_body = tk.Label(
+        preview_card,
+        text="Ideale per nomi propri, elenchi e rubriche: il testo convertito resta in primo piano e sempre leggibile.",
+        bg=CARD_BG,
+        fg=TEXT_SECONDARY,
+        font=('Segoe UI', 10),
+        wraplength=760,
+        justify=tk.LEFT,
+    )
+    preview_body.pack(anchor='w', fill=tk.X, pady=(6, 14))
+    bind_responsive_wrap(preview_body, preview_card, padding=40, min_wrap=240)
 
     text_display = tk.Text(preview_card, wrap=tk.WORD, height=12)
     configure_text_widget(text_display, readonly=True)
@@ -179,17 +209,68 @@ def main():
     metadata_card = create_card(bottom_row, padding=20)
     metadata_card.grid(row=0, column=0, sticky='nsew', padx=(0, 12))
     tk.Label(metadata_card, text="Dettagli clipboard", bg=CARD_BG, fg=TEXT_PRIMARY, font=('Segoe UI Semibold', 15)).pack(anchor='w')
-    metadata_label = tk.Label(metadata_card, text="Nessun contenuto recente", bg=CARD_BG, fg=TEXT_SECONDARY, font=('Segoe UI', 10), justify='left', anchor='w')
+    metadata_label = tk.Label(
+        metadata_card,
+        text="Nessun contenuto recente",
+        bg=CARD_BG,
+        fg=TEXT_SECONDARY,
+        font=('Segoe UI', 10),
+        justify='left',
+        anchor='w',
+    )
     metadata_label.pack(anchor='w', pady=(10, 0), fill=tk.X)
+    bind_responsive_wrap(metadata_label, metadata_card, padding=40, min_wrap=200)
 
     actions_card = create_card(bottom_row, padding=20)
     actions_card.grid(row=0, column=1, sticky='nsew')
     tk.Label(actions_card, text="Controlli", bg=CARD_BG, fg=TEXT_PRIMARY, font=('Segoe UI Semibold', 15)).pack(anchor='w')
     status_label = tk.Label(actions_card, text="Pronto", bg=CARD_BG, fg=SUCCESS, font=('Segoe UI Semibold', 11), anchor='w')
     status_label.pack(anchor='w', pady=(10, 16), fill=tk.X)
+    bind_responsive_wrap(status_label, actions_card, padding=40, min_wrap=180)
 
-    toggle_button = tk.Button(actions_card, text="Metti in pausa", command=lambda: toggle_running(toggle_button, pill), bg=ACCENT, fg='white', activebackground=ACCENT_HOVER, activeforeground='white', relief='flat', bd=0, padx=18, pady=10, cursor='hand2', font=('Segoe UI Semibold', 10))
+    toggle_button = tk.Button(
+        actions_card,
+        text="Metti in pausa",
+        command=lambda: toggle_running(toggle_button, pill),
+        bg=ACCENT,
+        fg='white',
+        activebackground=ACCENT_HOVER,
+        activeforeground='white',
+        relief='flat',
+        bd=0,
+        padx=18,
+        pady=10,
+        cursor='hand2',
+        font=('Segoe UI Semibold', 10),
+    )
     toggle_button.pack(anchor='w')
+
+    def apply_compact_bottom_row():
+        metadata_card.grid_forget()
+        actions_card.grid_forget()
+        bottom_row.columnconfigure(0, weight=1)
+        bottom_row.columnconfigure(1, weight=0)
+        bottom_row.rowconfigure(0, weight=1)
+        bottom_row.rowconfigure(1, weight=1)
+        metadata_card.grid(row=0, column=0, sticky='nsew', pady=(0, 12))
+        actions_card.grid(row=1, column=0, sticky='nsew')
+
+    def apply_wide_bottom_row():
+        metadata_card.grid_forget()
+        actions_card.grid_forget()
+        bottom_row.columnconfigure(0, weight=3)
+        bottom_row.columnconfigure(1, weight=2)
+        bottom_row.rowconfigure(0, weight=1)
+        bottom_row.rowconfigure(1, weight=0)
+        metadata_card.grid(row=0, column=0, sticky='nsew', padx=(0, 12))
+        actions_card.grid(row=0, column=1, sticky='nsew')
+
+    bind_responsive_layout(
+        bottom_row,
+        threshold=900,
+        compact_layout=apply_compact_bottom_row,
+        wide_layout=apply_wide_bottom_row,
+    )
 
     clipboard_thread = threading.Thread(target=update_clipboard_content, args=(text_display, metadata_label, status_label), daemon=True)
     clipboard_thread.start()
